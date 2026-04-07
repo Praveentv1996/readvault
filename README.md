@@ -52,17 +52,46 @@ Ask the AI assistant anything about your collection:
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/praveentv18/readvault.git
+git clone https://github.com/Praveentv1996/readvault.git
 cd readvault
 
 # 2. Copy env file and fill in your values
 cp .env.example .env
+# Edit .env with your PostgreSQL, MongoDB, and OpenRouter credentials
 
-# 3. Start all services
+# 3. Start all services (forces rebuild from latest code)
 docker-compose up --build
+
+# 4. Stop services
+docker-compose down
 ```
 
 Open **http://localhost:5000** in your browser.
+
+### Build & Push Docker Image to Docker Hub
+
+```bash
+# 1. Login to Docker Hub
+docker login
+
+# 2. Build image with version tag (v1.1.0 = YouTube + Type feature)
+docker build -t praveentv1996/readvault:v1.1.0 .
+docker build -t praveentv1996/readvault:latest .
+
+# 3. Push to Docker Hub
+docker push praveentv1996/readvault:v1.1.0
+docker push praveentv1996/readvault:latest
+
+# 4. Now anyone can pull: docker pull praveentv1996/readvault:latest
+```
+
+### Docker Image Versions
+
+| Tag | Features | Date |
+|-----|----------|------|
+| `v1.0.0` | Initial release | 2 days ago |
+| `v1.1.0` | YouTube source + Type column | Today |
+| `latest` | Always the newest version | Today |
 
 ---
 
@@ -113,6 +142,42 @@ readvault/
     ├── script.js
     └── style.css
 ```
+
+---
+
+## Migrations & Updates
+
+### v1.1.0 Update (YouTube + Type Column)
+
+If you're upgrading from v1.0.0 to v1.1.0:
+
+#### 1. Pull Latest Code
+```bash
+git pull origin master
+```
+
+#### 2. Rebuild Docker Image
+```bash
+docker-compose down
+docker-compose up --build    # Forces rebuild with new code
+```
+
+#### 3. PostgreSQL Migration (Auto-runs)
+The migration runs automatically when the container starts if needed.
+
+#### 4. MongoDB Migrations (Optional, if using MongoDB)
+```bash
+# Inside the container or on your machine:
+node MONGO_DB_migrate_add_type.js
+node MONGO_DB_migrate_remove_pg_id.js
+```
+
+#### What Changed
+- ✅ Added **YouTube** as 5th content source
+- ✅ Added **Type** column (E-Book, AudioBook, VideoBook, Book)
+- ✅ Auto-calculated Type based on Source
+- ✅ 218+ existing books migrated with Type populated
+- ✅ MongoDB schema refactored (removed redundant pg_id)
 
 ---
 
