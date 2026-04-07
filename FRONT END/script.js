@@ -71,10 +71,10 @@ function rebuildAuthorDropdown() {
 }
 
 function renderSourceBars() {
-  const counts = { 'Kuku FM': 0, 'Kindle Unlimited': 0, 'Pushtaka Digital Media': 0, 'Book': 0 };
+  const counts = { 'Kuku FM': 0, 'Kindle Unlimited': 0, 'Pushtaka Digital Media': 0, 'YouTube': 0, 'Book': 0 };
   books.forEach(b => { if (counts[b.source] !== undefined) counts[b.source]++; });
   const max = Math.max(...Object.values(counts));
-  const colors = { 'Kuku FM': '#4ade80', 'Kindle Unlimited': '#60a5fa', 'Pushtaka Digital Media': '#c084fc', 'Book': '#fb923c' };
+  const colors = { 'Kuku FM': '#4ade80', 'Kindle Unlimited': '#60a5fa', 'Pushtaka Digital Media': '#c084fc', 'YouTube': '#ef4444', 'Book': '#fb923c' };
   document.getElementById('sourceBars').innerHTML = Object.entries(counts).map(([src, cnt]) =>
     `<div class="source-bar" style="height:${Math.round(cnt / max * 36) + 4}px;background:${colors[src]};opacity:.7;" title="${src}: ${cnt}"></div>`
   ).join('');
@@ -84,8 +84,17 @@ function sourceDotClass(source) {
   if (source.includes('Kuku'))    return 'dot-kuku';
   if (source.includes('Kindle'))  return 'dot-kindle';
   if (source.includes('Pushtaka') || source.includes('Pustaka')) return 'dot-pustaka';
+  if (source === 'YouTube')       return 'dot-youtube';
   if (source === 'Book')          return 'dot-book';
   return 'dot-other';
+}
+
+function getTypeBadgeClass(type) {
+  if (type === 'E-Book') return 'badge-ebook';
+  if (type === 'AudioBook') return 'badge-audiobook';
+  if (type === 'VideoBook') return 'badge-videobook';
+  if (type === 'Book') return 'badge-book';
+  return 'badge-other';
 }
 
 // ── Filtering / Sorting ──
@@ -144,7 +153,7 @@ function renderTable() {
   const tbody   = document.getElementById('tableBody');
 
   if (!page.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="no-results">
+    tbody.innerHTML = `<tr><td colspan="8"><div class="no-results">
       <i class="fas fa-search"></i>No books found matching your filters.</div></td></tr>`;
     return;
   }
@@ -160,6 +169,7 @@ function renderTable() {
           ${escHtml(b.source)}
         </div>
       </td>
+      <td><span class="badge ${getTypeBadgeClass(b.type)}">${escHtml(b.type || 'Unknown')}</span></td>
       <td><span class="badge ${b.status === 'Finished' ? 'badge-finished' : 'badge-reading'}">${escHtml(b.status)}</span></td>
       <td>${b.featuring
         ? `<span class="featuring-text">${escHtml(b.featuring)}</span>`

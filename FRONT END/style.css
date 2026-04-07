@@ -226,11 +226,17 @@ td.title-cell { max-width:300px; }
 .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
 .badge-finished { background:rgba(251,146,60,.12); color:var(--green); }
 .badge-reading  { background:rgba(251,146,60,.12);  color:var(--orange); }
+.badge-ebook    { background:rgba(96,165,250,.12); color:#60a5fa; }
+.badge-audiobook { background:rgba(251,146,60,.12); color:#fb923c; }
+.badge-videobook { background:rgba(248,113,113,.12); color:#f87171; }
+.badge-book     { background:rgba(74,222,128,.12); color:#4ade80; }
+.badge-other    { background:rgba(148,163,184,.12); color:#94a3b8; }
 .source-pill { display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--muted); }
 .source-dot  { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
 .dot-kuku    { background:#fb923c; }
 .dot-kindle  { background:#60a5fa; }
 .dot-pustaka { background:#c084fc; }
+.dot-youtube { background:#f87171; }
 .dot-book    { background:#4ade80; }
 .dot-other   { background:#94a3b8; }
 

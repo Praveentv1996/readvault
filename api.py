@@ -50,12 +50,24 @@ def get_mongo_collection(author):
     collection_name = author.strip().replace(" ", "_")
     return get_mongo_db()[collection_name]
 
+def get_type_from_source(source):
+    """Calculate Type based on Source value"""
+    if source in ["Kindle Unlimited", "Pushtaka Digital Media"]:
+        return "E-Book"
+    elif source == "Kuku FM":
+        return "AudioBook"
+    elif source == "YouTube":
+        return "VideoBook"
+    elif source == "Book":
+        return "Book"
+    return "Unknown"
+
 
 @app.route('/api/books', methods=['GET'])
 def get_books():
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute("SELECT id, title, author, source, status, featuring FROM book ORDER BY id")
+    cur.execute("SELECT id, title, author, source, type, status, featuring FROM book ORDER BY id")
     rows = [dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
     return jsonify(rows)
@@ -64,18 +76,20 @@ def get_books():
 @app.route('/api/books', methods=['POST'])
 def add_book():
     data = request.json
+    source = data.get('source','')
+    book_type = get_type_from_source(source)
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
-        "INSERT INTO book (title, author, source, status, featuring) VALUES (%s, %s, %s, %s, %s) RETURNING *",
-        (data['title'], data['author'], data.get('source',''), data.get('status','Finished'), data.get('featuring',''))
+        "INSERT INTO book (title, author, source, type, status, featuring) VALUES (%s, %s, %s, %s, %s, %s) RETURNING *",
+        (data['title'], data['author'], source, book_type, data.get('status','Finished'), data.get('featuring',''))
     )
     row = dict(cur.fetchone())
     conn.commit(); cur.close(); conn.close()
 
     # Mirror to MongoDB
     col = get_mongo_collection(row['author'])
-    col.update_one({"pg_id": row['id']}, {"$set": {**row, "pg_id": row['id']}}, upsert=True)
+    col.update_one({"id": row['id']}, {"$set": row}, upsert=True)
 
     return jsonify(row), 201
 
@@ -83,11 +97,13 @@ def add_book():
 @app.route('/api/books/<int:book_id>', methods=['PUT'])
 def update_book(book_id):
     data = request.json
+    source = data.get('source','')
+    book_type = get_type_from_source(source)
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
-        "UPDATE book SET title=%s, author=%s, source=%s, status=%s, featuring=%s WHERE id=%s RETURNING *",
-        (data['title'], data['author'], data.get('source',''), data.get('status','Finished'), data.get('featuring',''), book_id)
+        "UPDATE book SET title=%s, author=%s, source=%s, type=%s, status=%s, featuring=%s WHERE id=%s RETURNING *",
+        (data['title'], data['author'], source, book_type, data.get('status','Finished'), data.get('featuring',''), book_id)
     )
     row = cur.fetchone()
     conn.commit(); cur.close(); conn.close()
@@ -97,7 +113,7 @@ def update_book(book_id):
 
     # Mirror to MongoDB
     col = get_mongo_collection(row['author'])
-    col.update_one({"pg_id": book_id}, {"$set": {**row, "pg_id": book_id}}, upsert=True)
+    col.update_one({"id": book_id}, {"$set": row}, upsert=True)
 
     return jsonify(row)
 
@@ -117,7 +133,7 @@ def delete_book(book_id):
 
     # Mirror to MongoDB
     col = get_mongo_collection(author)
-    col.delete_one({"pg_id": book_id})
+    col.delete_one({"id": book_id})
 
     return jsonify({'deleted': book_id})
 
@@ -134,7 +150,7 @@ def ai_chat():
     # Fetch all books from PostgreSQL for context
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute("SELECT title, author, source, status, featuring FROM book ORDER BY author, title")
+    cur.execute("SELECT title, author, source, type, status, featuring FROM book ORDER BY author, title")
     books = [dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
 
@@ -144,7 +160,8 @@ He reads Tamil novels — mostly detective fiction, thrillers, and romance.
 His complete book collection ({len(books)} books) from the database:
 {json.dumps(books, ensure_ascii=False, indent=2)}
 
-Sources he uses: Kuku FM (audio), Kindle Unlimited (ebook), Pushtaka Digital Media (ebook), Book (physical).
+Sources he uses: Kuku FM (audio), Kindle Unlimited (ebook), Pushtaka Digital Media (ebook), YouTube (video), Book (physical).
+Types: AudioBook (Kuku FM), E-Book (Kindle/Pushtaka), VideoBook (YouTube), Book (physical).
 Statuses: Finished = completed reading, Reading = currently reading.
 
 Answer questions about his collection, provide insights, recommend what to read next, find books by author/source/status, and analyze reading patterns.
