@@ -1,5 +1,7 @@
 const API = '/api/books';
 
+document.addEventListener('keydown', e => { if (e.key === 'F5') { e.preventDefault(); location.reload(); } });
+
 // ── State ──
 let books    = [];
 let filtered = [];
@@ -8,12 +10,30 @@ let sortKey  = '';
 let sortAsc  = true;
 let editId   = null;   // id of the book being edited (null = new)
 
+// Debounce helper
+function debounce(func, delay) {
+  let timeoutId;
+  return function(...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+}
+
+// Debounced filter application (300ms delay)
+const applyFiltersDebounced = debounce(applyFilters, 300);
+
 // ── Init ──
 async function init() {
   await loadBooks();
   rebuildAuthorDropdown();
   renderSourceBars();
   applyFilters();
+
+  // Setup debounced search handler
+  const searchInput = document.getElementById('globalSearch');
+  if (searchInput) {
+    searchInput.addEventListener('input', applyFiltersDebounced);
+  }
 }
 
 async function loadBooks() {
@@ -351,91 +371,6 @@ function handleThemeOverlay(e) {
 
 // Load saved theme on startup
 (function () {
-  const saved = localStorage.getItem('booksTheme') || 'orange';
+  const saved = localStorage.getItem('booksTheme') || 'white';
   setTheme(saved);
 })();
-
-// ── AI Chat ──
-let chatHistory = [];
-let chatOpen = false;
-
-function toggleChat() {
-  chatOpen = !chatOpen;
-  document.getElementById('chatPanel').classList.toggle('open', chatOpen);
-  document.getElementById('chatOverlay').classList.toggle('open', chatOpen);
-  if (chatOpen) document.getElementById('chatInput').focus();
-}
-
-function appendBubble(role, text) {
-  const msgs = document.getElementById('chatMessages');
-  const div = document.createElement('div');
-  div.className = `chat-bubble ${role}`;
-  const content = document.createElement('div');
-  content.className = 'bubble-content';
-  if (role === 'ai') {
-    content.classList.add('markdown');
-    content.innerHTML = marked.parse(text);
-  } else {
-    content.textContent = text;
-  }
-  div.appendChild(content);
-  msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
-  return div;
-}
-
-function appendTyping() {
-  const msgs = document.getElementById('chatMessages');
-  const div = document.createElement('div');
-  div.className = 'chat-bubble ai chat-typing';
-  div.id = 'typingIndicator';
-  div.innerHTML = `<div class="bubble-content">Thinking...</div>`;
-  msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-function removeTyping() {
-  const el = document.getElementById('typingIndicator');
-  if (el) el.remove();
-}
-
-async function sendChat() {
-  const input = document.getElementById('chatInput');
-  const sendBtn = document.querySelector('.chat-send');
-  const message = input.value.trim();
-  if (!message) return;
-
-  input.value = '';
-  input.disabled = true;
-  sendBtn.disabled = true;
-
-  appendBubble('user', message);
-  appendTyping();
-
-  chatHistory.push({ role: 'user', content: message });
-
-  try {
-    const res = await fetch('/api/ai/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history: chatHistory.slice(0, -1) })
-    });
-    const data = await res.json();
-    removeTyping();
-
-    if (data.error) {
-      appendBubble('ai', `Error: ${data.error}`);
-    } else {
-      const reply = data.response || 'No response received.';
-      chatHistory.push({ role: 'assistant', content: reply });
-      appendBubble('ai', reply);
-    }
-  } catch (e) {
-    removeTyping();
-    appendBubble('ai', `Error: ${e.message}. Make sure api.py is running.`);
-  }
-
-  input.disabled = false;
-  sendBtn.disabled = false;
-  input.focus();
-}

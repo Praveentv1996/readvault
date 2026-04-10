@@ -1,15 +1,18 @@
 import threading
 import time
 import ctypes
+import os
 import webview
 from api import app as flask_app
+
+ICON = os.path.join(os.path.dirname(__file__), 'bookshelf.ico')
 
 def start_flask():
     flask_app.run(port=5000, debug=False, use_reloader=False)
 
 def set_square_corners():
     time.sleep(0.5)
-    hwnd = ctypes.windll.user32.FindWindowW(None, 'ReadVault')
+    hwnd = ctypes.windll.user32.FindWindowW(None, 'BookVault')
     if hwnd:
         DWMWA_WINDOW_CORNER_PREFERENCE = 33
         DWMWCP_DONOTROUND = 1
@@ -25,11 +28,11 @@ if __name__ == '__main__':
     time.sleep(1)
 
     window = webview.create_window(
-        title='ReadVault',
+        title='BookVault',
         url='http://localhost:5000',
         width=1400,
         height=860,
         min_size=(900, 600)
     )
     threading.Thread(target=set_square_corners, daemon=True).start()
-    webview.start()
+    webview.start(icon=ICON)

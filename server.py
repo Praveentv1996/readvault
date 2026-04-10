@@ -1,21 +1,46 @@
 import asyncio
 import json
+import os
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp import types
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DB_CONFIG = {
-    "host": "localhost",
-    "database": "BOOK",
-    "user": "postgres",
-    "password": "Pravin#.2",
-    "port": "5432"
+    "host": os.environ.get("DB_HOST", "localhost"),
+    "database": os.environ.get("DB_NAME", "BOOK"),
+    "user": os.environ.get("DB_USER", "postgres"),
+    "password": os.environ.get("DB_PASSWORD", ""),
+    "port": os.environ.get("DB_PORT", "5432")
 }
 
+# Connection pool
+_pg_pool = None
+
+def get_pool():
+    global _pg_pool
+    if _pg_pool is None:
+        _pg_pool = psycopg2.pool.SimpleConnectionPool(
+            1, 20,
+            host=DB_CONFIG["host"],
+            database=DB_CONFIG["database"],
+            user=DB_CONFIG["user"],
+            password=DB_CONFIG["password"],
+            port=DB_CONFIG["port"]
+        )
+    return _pg_pool
+
 def get_connection():
-    return psycopg2.connect(**DB_CONFIG)
+    return get_pool().getconn()
+
+def release_connection(conn):
+    if conn:
+        get_pool().putconn(conn)
 
 app = Server("postgres-mcp")
 
@@ -68,18 +93,22 @@ async def list_tools():
 @app.call_tool()
 async def call_tool(name: str, arguments: dict):
     if name == "query":
+        conn = None
         try:
             conn = get_connection()
             cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cur.execute(arguments["sql"])
             rows = cur.fetchall()
             cur.close()
-            conn.close()
             return [types.TextContent(type="text", text=json.dumps([dict(r) for r in rows], indent=2, default=str))]
         except Exception as e:
             return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+        finally:
+            if conn:
+                release_connection(conn)
 
     elif name == "execute":
+        conn = None
         try:
             conn = get_connection()
             cur = conn.cursor()
@@ -87,12 +116,17 @@ async def call_tool(name: str, arguments: dict):
             conn.commit()
             rowcount = cur.rowcount
             cur.close()
-            conn.close()
             return [types.TextContent(type="text", text=f"Success. Rows affected: {rowcount}")]
         except Exception as e:
+            if conn:
+                conn.rollback()
             return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+        finally:
+            if conn:
+                release_connection(conn)
 
     elif name == "list_tables":
+        conn = None
         try:
             conn = get_connection()
             cur = conn.cursor()
@@ -102,13 +136,19 @@ async def call_tool(name: str, arguments: dict):
             """)
             tables = [row[0] for row in cur.fetchall()]
             cur.close()
-            conn.close()
             return [types.TextContent(type="text", text=json.dumps(tables, indent=2))]
         except Exception as e:
             return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+        finally:
+            if conn:
+                release_connection(conn)
 
     elif name == "describe_table":
+        conn = None
         try:
+            table_name = arguments.get("table_name", "").strip()
+            if not table_name:
+                return [types.TextContent(type="text", text="Error: table_name is required")]
             conn = get_connection()
             cur = conn.cursor()
             cur.execute("""
@@ -116,14 +156,16 @@ async def call_tool(name: str, arguments: dict):
                 FROM information_schema.columns
                 WHERE table_name = %s AND table_schema = 'public'
                 ORDER BY ordinal_position
-            """, (arguments["table_name"],))
+            """, (table_name,))
             columns = cur.fetchall()
             cur.close()
-            conn.close()
             result = [{"column": c[0], "type": c[1], "nullable": c[2], "default": c[3]} for c in columns]
             return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
         except Exception as e:
             return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+        finally:
+            if conn:
+                release_connection(conn)
 
 async def main():
     async with stdio_server() as (read_stream, write_stream):
