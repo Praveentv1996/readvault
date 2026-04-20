@@ -374,3 +374,16 @@ function handleThemeOverlay(e) {
   const saved = localStorage.getItem('booksTheme') || 'white';
   setTheme(saved);
 })();
+
+// ── About ──
+function openAbout() {
+  document.getElementById('aboutOverlay').classList.add('open');
+}
+
+function closeAbout() {
+  document.getElementById('aboutOverlay').classList.remove('open');
+}
+
+function handleAboutOverlay(e) {
+  if (e.target === document.getElementById('aboutOverlay')) closeAbout();
+}
